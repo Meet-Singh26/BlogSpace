@@ -22,14 +22,13 @@ const HomePage = () => {
 
   // A list of categories for filtering blogs.
   let categories = [
-    "programming",
+    "coding",
     "hollywood",
-    "film making",
-    "social media",
+    "punjabi",
+    "ideas",
     "travel",
-    "cooking",
+    "music",
     "ai",
-    "temp",
   ];
 
   // This function fetches the latest blogs from the server.

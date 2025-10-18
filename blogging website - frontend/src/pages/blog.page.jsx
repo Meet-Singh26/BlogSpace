@@ -95,13 +95,19 @@ const BlogPage = () => {
 
   // The main effect hook that triggers fetching the blog data when the blog_id changes.
   useEffect(() => {
+    if (!blog_id) {
+      return; // Do nothing if blog_id is not yet available
+    }
     resetStates(); // Reset states before fetching new data.
     fetchBlog();
   }, [blog_id]);
 
   return (
     <AnimationWrapper>
-      {loading ? (
+      {/* Keep showing the loader if loading is true 
+    OR if blog.content is still the empty initial array.
+  */}
+      {loading || !blog.content.length ? (
         <Loader />
       ) : (
         // Provide the blog context to all child components.

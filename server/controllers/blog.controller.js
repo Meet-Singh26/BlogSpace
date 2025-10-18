@@ -139,7 +139,7 @@ export const getTrendingBlogs = async (req, res) => {
       "activity.total_likes": -1,
       publishedAt: -1,
     })
-    .select("blod_id title publishedAt -_id")
+    .select("blog_id title publishedAt -_id")
     .limit(5)
     .then((blogs) => {
       return res.status(200).json({ blogs });
@@ -219,35 +219,45 @@ export const getSearchBlogsCount = async (req, res) => {
 // Retrieves a single blog by blog_id
 export const getBlog = async (req, res) => {
   let { blog_id, draft, mode } = req.body;
-
   let incrementVal = mode != "edit" ? 1 : 0;
 
-  Blog.findOneAndUpdate(
-    { blog_id },
-    { $inc: { "activity.total_reads": incrementVal } }
-  )
-    .populate(
-      "author",
-      "personal_info.fullname personal_info.username personal_info.profile_img"
+  try {
+    // 1. Find the blog and increment its reads
+    const blog = await Blog.findOneAndUpdate(
+      { blog_id },
+      { $inc: { "activity.total_reads": incrementVal } }
     )
-    .select("title des content banner activity publishedAt blog_id tags")
-    .then((blog) => {
-      User.findOneAndUpdate(
-        { "personal_info.username": blog.author.personal_info.username },
-        { $inc: { "account_info.total_reads": incrementVal } }
-      ).catch((err) => {
-        return res.status(500).json({ error: error.message });
-      });
+      .populate(
+        "author",
+        "personal_info.fullname personal_info.username personal_info.profile_img"
+      )
+      .select("title des content banner activity publishedAt blog_id tags");
 
-      if (blog.draft && !draft) {
-        return res.status(500).json({ error: "you can't access draft blog" });
-      }
+    // 2. === SERVER FIX ===
+    //    Handle the case where the blog is not found
+    if (!blog) {
+      return res.status(404).json({ error: "Blog not found" });
+    }
 
-      return res.status(200).json({ blog });
-    })
-    .catch((err) => {
-      return res.status(500).json({ error: err.message });
-    });
+    // 3. Handle draft access
+    if (blog.draft && !draft) {
+      return res.status(500).json({ error: "You can't access draft blog" });
+    }
+
+    // 4. Update the author's total reads.
+    //    We await this to ensure it completes before we send the response.
+    //    (This fixes your race condition)
+    await User.findOneAndUpdate(
+      { "personal_info.username": blog.author.personal_info.username },
+      { $inc: { "account_info.total_reads": incrementVal } }
+    );
+
+    // 5. Only send the response after all database operations are successful
+    return res.status(200).json({ blog });
+  } catch (err) {
+    // This single catch block will handle errors from all 'await' operations
+    return res.status(500).json({ error: err.message });
+  }
 };
 
 // Likes or unlikes a blog
